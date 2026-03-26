@@ -6,6 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -22,7 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import type { Product } from "@/lib/store";
+import type { Product, Category } from "@/lib/store";
 
 interface AdminPanelProps {
   products: Product[];
@@ -38,6 +45,7 @@ interface FormState {
   description: string;
   imageUrl: string;
   whatsapp: string;
+  category: Category;
 }
 
 interface FormErrors {
@@ -85,7 +93,14 @@ function validate(data: FormState): FormErrors {
   return errs;
 }
 
-const emptyForm: FormState = { name: "", price: "", description: "", imageUrl: "", whatsapp: "" };
+const emptyForm: FormState = {
+  name: "", price: "", description: "", imageUrl: "", whatsapp: "", category: "cosmeticos",
+};
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  cosmeticos: "Cosméticos",
+  roupas: "Roupas",
+};
 
 const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPanelProps) => {
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -127,6 +142,7 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
         description: form.description.trim(),
         imageUrl: form.imageUrl.trim(),
         whatsapp: form.whatsapp.replace(/\D/g, ""),
+        category: form.category,
       });
       setForm(emptyForm);
       setErrors({});
@@ -138,7 +154,10 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
 
   const openEdit = (p: Product) => {
     setEditProduct(p);
-    setEditForm({ name: p.name, price: String(p.price), description: p.description, imageUrl: p.imageUrl, whatsapp: p.whatsapp });
+    setEditForm({
+      name: p.name, price: String(p.price), description: p.description,
+      imageUrl: p.imageUrl, whatsapp: p.whatsapp, category: p.category,
+    });
     setEditErrors({});
     setEditTouched({});
   };
@@ -168,6 +187,7 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
         description: editForm.description.trim(),
         imageUrl: editForm.imageUrl.trim(),
         whatsapp: editForm.whatsapp.replace(/\D/g, ""),
+        category: editForm.category,
       });
       setEditProduct(null);
     } finally {
@@ -218,6 +238,18 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
               <FieldError msg={touched.price ? errors.price : undefined} />
             </div>
             <div className="space-y-1">
+              <Label htmlFor="p-cat">Categoria *</Label>
+              <Select value={form.category} onValueChange={(v) => handleChange("category", v)}>
+                <SelectTrigger id="p-cat">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cosmeticos">Cosméticos</SelectItem>
+                  <SelectItem value="roupas">Roupas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="p-image">URL da Imagem</Label>
               <Input id="p-image" value={form.imageUrl} onChange={(e) => handleChange("imageUrl", e.target.value)} onBlur={() => handleBlur("imageUrl")} placeholder="https://..." className={errors.imageUrl && touched.imageUrl ? "border-destructive" : ""} />
               <FieldError msg={touched.imageUrl ? errors.imageUrl : undefined} />
@@ -227,7 +259,7 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
               <Input id="p-whats" value={form.whatsapp} onChange={(e) => handleChange("whatsapp", e.target.value)} onBlur={() => handleBlur("whatsapp")} placeholder="5511999999999" className={errors.whatsapp && touched.whatsapp ? "border-destructive" : ""} />
               <FieldError msg={touched.whatsapp ? errors.whatsapp : undefined} />
             </div>
-            <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+            <div className="space-y-1">
               <Label htmlFor="p-desc">Descrição</Label>
               <Textarea id="p-desc" value={form.description} onChange={(e) => handleChange("description", e.target.value)} placeholder="Descrição curta" rows={2} />
             </div>
@@ -248,6 +280,7 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
             <div className="flex flex-wrap gap-2">
               {products.map((p) => (
                 <span key={p.id} className="inline-flex items-center gap-1 rounded-full bg-card px-3 py-1 text-sm text-foreground shadow-sm">
+                  <span className="text-xs text-muted-foreground">[{CATEGORY_LABELS[p.category]}]</span>
                   {p.name}
                   <button onClick={() => openEdit(p)} className="ml-1 text-muted-foreground hover:text-primary" aria-label={`Editar ${p.name}`}>
                     <Pencil className="h-3 w-3" />
@@ -280,6 +313,18 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
               <FieldError msg={editTouched.price ? editErrors.price : undefined} />
             </div>
             <div className="space-y-1">
+              <Label htmlFor="e-cat">Categoria *</Label>
+              <Select value={editForm.category} onValueChange={(v) => handleEditChange("category", v)}>
+                <SelectTrigger id="e-cat">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cosmeticos">Cosméticos</SelectItem>
+                  <SelectItem value="roupas">Roupas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="e-image">URL da Imagem</Label>
               <Input id="e-image" value={editForm.imageUrl} onChange={(e) => handleEditChange("imageUrl", e.target.value)} onBlur={() => handleEditBlur("imageUrl")} placeholder="https://..." className={editErrors.imageUrl && editTouched.imageUrl ? "border-destructive" : ""} />
               <FieldError msg={editTouched.imageUrl ? editErrors.imageUrl : undefined} />
@@ -297,7 +342,7 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditProduct(null)} disabled={editSaving}>Cancelar</Button>
             <Button onClick={handleEditSave} disabled={editSaving}>
-              {editSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : "Salvar alterações"}
+              {editSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Salvando...</> : "Salvar alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -321,7 +366,7 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
               onClick={handleConfirmDelete}
               disabled={deleting}
             >
-              {deleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removendo...</> : "Sim, remover"}
+              {deleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Removendo...</> : "Sim, remover"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

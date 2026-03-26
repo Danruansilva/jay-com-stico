@@ -1,5 +1,7 @@
 import { supabase } from "./supabaseClient";
 
+export type Category = "cosmeticos" | "roupas";
+
 export interface Product {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export interface Product {
   description: string;
   imageUrl: string;
   whatsapp: string;
+  category: Category;
 }
 
 function fromDb(row: Record<string, unknown>): Product {
@@ -17,6 +20,7 @@ function fromDb(row: Record<string, unknown>): Product {
     description: (row.description as string) ?? "",
     imageUrl: (row.image_url as string) ?? "",
     whatsapp: (row.whatsapp as string) ?? "",
+    category: ((row.category as string) ?? "cosmeticos") as Category,
   };
 }
 
@@ -38,6 +42,7 @@ export async function addProduct(product: Omit<Product, "id">): Promise<Product>
       description: product.description,
       image_url: product.imageUrl,
       whatsapp: product.whatsapp,
+      category: product.category,
     })
     .select()
     .single();
@@ -54,6 +59,7 @@ export async function updateProduct(product: Product): Promise<Product> {
       description: product.description,
       image_url: product.imageUrl,
       whatsapp: product.whatsapp,
+      category: product.category,
     })
     .eq("id", product.id)
     .select()
