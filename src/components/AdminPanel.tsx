@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, LogOut, Trash2, Pencil, AlertCircle } from "lucide-react";
+import { Plus, LogOut, Trash2, Pencil, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,9 +26,9 @@ import type { Product } from "@/lib/store";
 
 interface AdminPanelProps {
   products: Product[];
-  onAdd: (product: Omit<Product, "id">) => void;
-  onUpdate: (product: Product) => void;
-  onRemove: (id: string) => void;
+  onAdd: (product: Omit<Product, "id">) => Promise<void>;
+  onUpdate: (product: Product) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
   onLogout: () => void;
 }
 
@@ -88,21 +88,20 @@ function validate(data: FormState): FormErrors {
 const emptyForm: FormState = { name: "", price: "", description: "", imageUrl: "", whatsapp: "" };
 
 const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPanelProps) => {
-  // Formulário de adição
   const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState(false);
 
-  // Confirmação de exclusão
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Modal de edição
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
   const [editErrors, setEditErrors] = useState<FormErrors>({});
   const [editTouched, setEditTouched] = useState<Record<string, boolean>>({});
+  const [editSaving, setEditSaving] = useState(false);
 
-  // — Handlers do formulário de adição —
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
     setErrors(validate(form));
@@ -114,34 +113,32 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
     if (touched[field]) setErrors(validate(updated));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ name: true, price: true, imageUrl: true, whatsapp: true });
     const errs = validate(form);
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    onAdd({
-      name: form.name.trim(),
-      price: parseFloat(parseFloat(form.price).toFixed(2)),
-      description: form.description.trim(),
-      imageUrl: form.imageUrl.trim(),
-      whatsapp: form.whatsapp.replace(/\D/g, ""),
-    });
-    setForm(emptyForm);
-    setErrors({});
-    setTouched({});
+    setSaving(true);
+    try {
+      await onAdd({
+        name: form.name.trim(),
+        price: parseFloat(parseFloat(form.price).toFixed(2)),
+        description: form.description.trim(),
+        imageUrl: form.imageUrl.trim(),
+        whatsapp: form.whatsapp.replace(/\D/g, ""),
+      });
+      setForm(emptyForm);
+      setErrors({});
+      setTouched({});
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // — Handlers do modal de edição —
   const openEdit = (p: Product) => {
     setEditProduct(p);
-    setEditForm({
-      name: p.name,
-      price: String(p.price),
-      description: p.description,
-      imageUrl: p.imageUrl,
-      whatsapp: p.whatsapp,
-    });
+    setEditForm({ name: p.name, price: String(p.price), description: p.description, imageUrl: p.imageUrl, whatsapp: p.whatsapp });
     setEditErrors({});
     setEditTouched({});
   };
@@ -157,21 +154,36 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
     if (editTouched[field]) setEditErrors(validate(updated));
   };
 
-  const handleEditSave = () => {
+  const handleEditSave = async () => {
     setEditTouched({ name: true, price: true, imageUrl: true, whatsapp: true });
     const errs = validate(editForm);
     setEditErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-    if (!editProduct) return;
-    onUpdate({
-      ...editProduct,
-      name: editForm.name.trim(),
-      price: parseFloat(parseFloat(editForm.price).toFixed(2)),
-      description: editForm.description.trim(),
-      imageUrl: editForm.imageUrl.trim(),
-      whatsapp: editForm.whatsapp.replace(/\D/g, ""),
-    });
-    setEditProduct(null);
+    if (Object.keys(errs).length > 0 || !editProduct) return;
+    setEditSaving(true);
+    try {
+      await onUpdate({
+        ...editProduct,
+        name: editForm.name.trim(),
+        price: parseFloat(parseFloat(editForm.price).toFixed(2)),
+        description: editForm.description.trim(),
+        imageUrl: editForm.imageUrl.trim(),
+        whatsapp: editForm.whatsapp.replace(/\D/g, ""),
+      });
+      setEditProduct(null);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await onRemove(confirmDelete.id);
+      setConfirmDelete(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const FieldError = ({ msg }: { msg?: string }) =>
@@ -186,15 +198,12 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
     <div className="border-b bg-accent/30 py-6">
       <div className="container mx-auto px-4">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-xl font-semibold text-foreground">
-            Painel Administrativo
-          </h2>
+          <h2 className="font-display text-xl font-semibold text-foreground">Painel Administrativo</h2>
           <Button variant="ghost" size="sm" onClick={onLogout} className="gap-2 text-muted-foreground">
             <LogOut className="h-4 w-4" /> Sair
           </Button>
         </div>
 
-        {/* Formulário de adição */}
         <Card className="p-5">
           <h3 className="mb-3 font-display text-lg font-medium">Adicionar Produto</h3>
           <form onSubmit={handleSubmit} noValidate className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -223,14 +232,14 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
               <Textarea id="p-desc" value={form.description} onChange={(e) => handleChange("description", e.target.value)} placeholder="Descrição curta" rows={2} />
             </div>
             <div className="flex items-end">
-              <Button type="submit" className="w-full gap-2">
-                <Plus className="h-4 w-4" /> Adicionar
+              <Button type="submit" className="w-full gap-2" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                {saving ? "Salvando..." : "Adicionar"}
               </Button>
             </div>
           </form>
         </Card>
 
-        {/* Lista de produtos */}
         {products.length > 0 && (
           <div className="mt-4">
             <h3 className="mb-2 font-display text-sm font-medium text-muted-foreground">
@@ -286,13 +295,15 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditProduct(null)}>Cancelar</Button>
-            <Button onClick={handleEditSave}>Salvar alterações</Button>
+            <Button variant="outline" onClick={() => setEditProduct(null)} disabled={editSaving}>Cancelar</Button>
+            <Button onClick={handleEditSave} disabled={editSaving}>
+              {editSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : "Salvar alterações"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de confirmação de exclusão */}
+      {/* Confirmação de exclusão */}
       <AlertDialog open={!!confirmDelete} onOpenChange={() => setConfirmDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -304,12 +315,13 @@ const AdminPanel = ({ products, onAdd, onUpdate, onRemove, onLogout }: AdminPane
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { if (confirmDelete) { onRemove(confirmDelete.id); setConfirmDelete(null); } }}
+              onClick={handleConfirmDelete}
+              disabled={deleting}
             >
-              Sim, remover
+              {deleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Removendo...</> : "Sim, remover"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

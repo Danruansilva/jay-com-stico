@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { Search, X, Loader2 } from "lucide-react";
 import heroBanner from "@/assets/hero-banner.jpg";
 import StoreHeader from "@/components/StoreHeader";
 import AdminLoginModal from "@/components/AdminLoginModal";
@@ -19,11 +19,21 @@ const PRICE_RANGES = [
 ];
 
 const Index = () => {
-  const [products, setProducts] = useState<Product[]>(getProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [search, setSearch] = useState("");
   const [priceRange, setPriceRange] = useState(0);
+
+  // Carregar produtos do Supabase na inicialização
+  useEffect(() => {
+    getProducts()
+      .then(setProducts)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleAdminClick = () => {
     if (isAdmin) return;
@@ -35,18 +45,18 @@ const Index = () => {
     setShowLogin(false);
   };
 
-  const handleAdd = useCallback((data: Omit<Product, "id">) => {
-    const newProduct = addProduct(data);
+  const handleAdd = useCallback(async (data: Omit<Product, "id">) => {
+    const newProduct = await addProduct(data);
     setProducts((prev) => [...prev, newProduct]);
   }, []);
 
-  const handleUpdate = useCallback((updated: Product) => {
-    updateProduct(updated);
-    setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+  const handleUpdate = useCallback(async (updated: Product) => {
+    const saved = await updateProduct(updated);
+    setProducts((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
   }, []);
 
-  const handleRemove = useCallback((id: string) => {
-    removeProduct(id);
+  const handleRemove = useCallback(async (id: string) => {
+    await removeProduct(id);
     setProducts((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
@@ -159,8 +169,16 @@ const Index = () => {
           )}
         </div>
 
-        {/* Grid */}
-        {filtered.length > 0 ? (
+        {/* Estados: carregando / erro / vazio / grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <p className="py-20 text-center text-destructive">
+            Erro ao carregar produtos: {error}
+          </p>
+        ) : filtered.length > 0 ? (
           <>
             {hasActiveFilter && (
               <p className="mb-4 text-sm text-muted-foreground">
